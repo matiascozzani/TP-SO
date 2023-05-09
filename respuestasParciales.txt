@@ -1,0 +1,48 @@
+1)  La característica de atomicidad nos garantiza que las operaciones atómicas se realizan de forma indivisible o no se realizan.
+    Esta caracteristica de "todo o nada" nos permite realizar operaciones que dentro de un contexto concurrente no generan incoherencia de datos
+    ni condiciones de carrera.
+
+    Si un programa utiliza esta lista atómica como estructura de datos, queda garantizado que estará protegido frente a condiciones de carrera que puedan ocurrir
+    entre los threads que la utilicen.
+
+    En esta implementación particular se logra la atomicidad a través del uso de estructuras atómicas.
+    En particular, los nodos de la lista enlazada se establecen atómicos a través del template de c++ atomic.
+
+    Para la inserción en esta lista, primero se construye el nuevo nodo asociado con el valor pasado por parámetro.
+    Luego, se establece que el próximo elemento del nodo será la anterior cabeza de la lista.
+
+    Por último, hace falta reemplazar la cabeza actual por el nuevo nodo que se está insertando. Aquí es donde debemos ser especialmente cuidadosos 
+    pues otro hilo podría haber insertado un elemento justo antes de que se ejecute este comportamiento en particular.
+
+    Para resolver este inconveniente, se utiliza la primitiva compare_exchange_weak que nos permite comparar el valor de una variable atómica
+    (la cabeza de la lista) con un valor esperado (el siguiente del nuevo nodo a insertar), si son iguales entonces reemplazamos el valor de la variable atómica
+    por el valor deseado (el nuevo nodo).
+
+    En caso de que no sean iguales, el valor esperado se actualiza de manera atómica para obtener el valor de la variable atómica que se estaba utilizando en un principio.
+
+    Podría ejemplificarse de la siguiente manera:
+
+    if(atomicValue == expectedValue)
+        atomicValue = desiredValue;
+        return true;
+    else
+        expectedValue = atomicValue;
+        return false;
+    
+    En nuestro caso:
+    if(cabecera == nuevoNodo->siguiente)
+        cabecera = nuevoNodo;
+        return true;
+    else
+        nuevoNodo->siguiente = cabecera;
+        return false;
+
+    A notar: lo hace de manera atómica, lo que garantiza que no nos enfrentaremos a condiciones de carrera.
+    
+    Por último, es importante notar que se aprovecha el booleano que devuelve la función para poder encerrarla dentro de un bucle que intente insertar hasta que sea seguro hacerlo.
+
+    Esto se debe a que justo entre que creamos el nuevo nodo y vamos a realizar el exchange otro thread podría haber modificado la cabecera de la lista.
+    En cuyo caso, cuando la función se ejecute: cabecera != nuevoNodo->siguiente, por lo que se actualizará el valor que se le asigna al siguiente del nuevo nodo
+    con el valor de la nueva cabecera de la lista. 
+    Esto ocurrirá hasta que coincidan, momento en el que se realiza el reemplazo, asegurando que la concurrencia se dará bien para esta operación.
+
