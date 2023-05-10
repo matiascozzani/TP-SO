@@ -46,3 +46,16 @@
     con el valor de la nueva cabecera de la lista. 
     Esto ocurrirá hasta que coincidan, momento en el que se realiza el reemplazo, asegurando que la concurrencia se dará bien para esta operación.
 
+
+    2) Se decidió implementar un arreglo de mutex a fin de resolver ambos problemas,
+    por un lado salvarnos de las race-conditions. Pero también, al permitirnos controlar
+    exactamente que zonas bloquear que zonas no, reducir la contención a lo mínimo posible.
+
+    Cada modificación que se realiza sobre una entrada particular de la tabla de hash
+    ha de pedir primero un permiso en el mutex correspondiente. Solo una vez que lo obtiene trabaja sobre ella.
+    Al salir, lo libera para que otros puedan trabajar sobre ella.
+
+    Del mismo modo la lectura se realiza bloqueando modificaciones sobre esa entrada de la tabla.
+
+    De este modo, si dos threads quieren realizar operaciones sobre entradas distintas de la tabla de hash
+    podrán hacerlo sin problemas. Cuando no sea este el caso, habrá contención y una deberá esperar a que la otra termine para efectuar sus operaciones.

@@ -7,90 +7,151 @@
 
 #include "HashMapConcurrente.hpp"
 
-HashMapConcurrente::HashMapConcurrente() {
-    for (unsigned int i = 0; i < HashMapConcurrente::cantLetras; i++) {
+HashMapConcurrente::HashMapConcurrente()
+{
+    for (unsigned int i = 0; i < HashMapConcurrente::cantLetras; i++)
+    {
         tabla[i] = new ListaAtomica<hashMapPair>();
     }
 }
 
-unsigned int HashMapConcurrente::hashIndex(std::string clave) {
+unsigned int HashMapConcurrente::hashIndex(std::string clave)
+{
     return (unsigned int)(clave[0] - 'a');
 }
 
-void HashMapConcurrente::incrementar(std::string clave) {
-    //obtenemos el indice al que debería pertenecer esta clave si existe.
+void HashMapConcurrente::incrementar(std::string clave)
+{
+    // obtenemos el indice al que debería pertenecer esta clave si existe.
     unsigned int claveIndex = hashIndex(clave);
-    //obtenemos la longitud de la lista atómica asociada con esta clave
+    // obtenemos la longitud de la lista atómica asociada con esta clave
+
+    // debería encerrarse todo esto en un while(true)?
     unsigned int longitudTabla = tabla[claveIndex]->longitud();
-    //la recorremos y queremos ver si está presente o no
+    // la recorremos y queremos ver si está presente o no
     bool clavePresente = false;
-    for(unsigned int i = 0; i < longitudTabla; i++){
-        auto& elemento = tabla[claveIndex]->iesimo(i);
-        if(elemento.first == clave){
-            //obtengo atómicamente el valor actual
-            unsigned int actual = elemento.second.load();
-            //el valor deseado
-            unsigned int nuevo = actual + 1;
-            //utilizamos compare exchange weak para chequear que el valor actual sea, en efecto, el valor real actual
-            //y que no haya ningún thread que lo haya modificado.
-            //si eso sucedió, la operación cargará en actual el valor real actualizado luego de que el otro thread lo haya modificado;
-            //además también re-incrementamos el valor deseado una vez que hemos obtenido el nuevo valor real.
-            //cuando sea seguro, actualizamos la variable.
-            while(!elemento.second.compare_exchange_weak(actual, nuevo)){
-                nuevo = actual + 1;
-            }
+    for (unsigned int i = 0; i < longitudTabla; i++)
+    {
+        mutexes[claveIndex].lock();
+        auto &elemento = tabla[claveIndex]->iesimo(i);
+        if (elemento.first == clave)
+        {   
+            elemento.second++;
+            mutexes[claveIndex].unlock();
             clavePresente = true;
             break;
         }
     }
-    //si la clave no estaba presente, la insertamos.
-    if(!clavePresente){
-        hashMapPair<std::string, unsigned int> newPair;
-        newPair.first = clave;
-        newPair.second = 1;
-        tabla[claveIndex]->insertar(newPair);
+    // si la clave no estaba presente, la insertamos.
+    if (!clavePresente)
+    {
+        tabla[claveIndex]->insertar(make_pair(clave, 1));
     }
+    mutexes[claveIndex].unlock();
 }
 
-std::vector<std::string> HashMapConcurrente::claves() {
-    // Completar (Ejercicio 2)
-    std::vector<std::string> aux;
-
-    for(unsigned int i = 0; i < 26; i++){
-        for(auto p : tabla[i]){
-            aux.push_back(p.first);
+std::vector<std::string> HashMapConcurrente::claves()
+{
+    vector<std::string> aux;
+    for (unsigned int i = 0; i < HashMapConcurrente::cantLetras; i++)
+    {
+        mutexes[i].lock();
+        unsigned int longitud = tabla[i]->longitud();
+        for(unsigned int j = 0; j < longitud; j++){
+            auto &elemento = tabla[i]->iesimo(j);
+            aux.push_back(elemento.first);
         }
+        mutexes[i].unlock();
     }
-
     return aux;
 }
 
-unsigned int HashMapConcurrente::valor(std::string clave) {
-    // Completar (Ejercicio 2)
+unsigned int HashMapConcurrente::valor(std::string clave)
+{
+    unsigned int res = 0;
+    unsigned int index = HashMapConcurrente::hashIndex(clave);
+    mutexes[index].lock();
+    unsigned int longitud = tabla[i]->longitud();
+    for(unsigned int i = 0; i < longitud; i++){
+        auto &elemento = tabla[i]->iesimo(i);
+        if(elemento.first == clave)
+            res = elemento.second;
+            break;
+    }
+    mutexes[index].unlock();
+    return res;
 }
 
-hashMapPair HashMapConcurrente::maximo() {
+hashMapPair HashMapConcurrente::maximo()
+{
     hashMapPair *max = new hashMapPair();
     max->second = 0;
 
-    for (unsigned int index = 0; index < HashMapConcurrente::cantLetras; index++) {
+    for (unsigned int index = 0; index < HashMapConcurrente::cantLetras; index++)
+    {  
+        mutexes[index].lock();
         for (
             auto it = tabla[index]->crearIt();
             it.haySiguiente();
-            it.avanzar()
-        ) {
-            if (it.siguiente().second > max->second) {
+            it.avanzar())
+        {
+            if (it.siguiente().second > max->second)
+            {
                 max->first = it.siguiente().first;
                 max->second = it.siguiente().second;
             }
         }
+        mutexes[index].unlock();
     }
 
     return *max;
 }
 
-hashMapPair HashMapConcurrente::maximoParalelo(unsigned int cantThreads) {
-    // Completar (Ejercicio 3)
+hashMapPair threadFila(){
+    unsigned int myIndex = indexParalelo.fetch_add(1);
+    while(myIndex < 26){
+        hashMapPair *maximoParcial = new hashMapPair();
+        maximoParcial->second = 0;
+        mutex[myIndex].lock();
+        for(auto it = tabla[myIndex]->crearIt();
+            it.haySiguiente();
+            it.avanzar()){
+                if(it.siguiente().second > maximoParcial->second)
+                {
+                    maximoParcial->first = it.siguiente().first;
+                    maximoParcial->second = it.siguiente().second;
+                }
+            }
+        mutex[myIndex].unlock();
+        maximosParciales.push_back(*maximoParcial);
+        myIndex = indexParalelo.fetch_add(1);
+    }
+
+}
+
+hashMapPair HashMapConcurrente::maximoParalelo(unsigned int cantThreads)
+{
+    pthread_t threads[cantThreads];
+    indexParalelo = 0;
+    maximosParciales = vector<hashMapPair>(26);
+    for(unsigned int i = 0; i < cantThreads; i++){
+        pthread_create(&(threads[i]), NULL, &HashMapConcurrente::threadFila, NULL)
+    }
+
+    for(auto id : threads)
+        pthread_join(id, NULL);
+
+    hashMapPair maximo = new hashMapPair();
+    maximo.second = 0;
+    for(auto p : maximosParciales){
+        if(p.second > maximo.second){
+            maximo.first = p.first;
+            maximo.second = p.second;
+        }
+    }
+
+    return maximo;
+
 }
 
 #endif
