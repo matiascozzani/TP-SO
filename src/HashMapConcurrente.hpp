@@ -24,14 +24,17 @@ public:
 
    hashMapPair maximo();
    hashMapPair maximoParalelo(unsigned int cantThreads);
+   void* threadFila(void* arg);
+
 
 private:
    ListaAtomica<hashMapPair> *tabla[HashMapConcurrente::cantLetras];
-   hashMapPair threadFila(ListaAtomica<hashMapPair> list);
+   static void* wrapperThreadFila(void* arg);
    static unsigned int hashIndex(std::string clave);
-   std::mutex mutexes[HashMapConcurrente::cantLetras];
    std::atomic<int> indexParalelo;
    std::vector<hashMapPair> maximosParciales;
+   std::mutex mutexes[HashMapConcurrente::cantLetras];
+
 };
 
 #endif /* HMC_HPP */

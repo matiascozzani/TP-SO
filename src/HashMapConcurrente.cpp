@@ -52,7 +52,7 @@ void HashMapConcurrente::incrementar(std::string clave)
 
 std::vector<std::string> HashMapConcurrente::claves()
 {
-    vector<std::string> aux;
+    std::vector<std::string> aux;
     for (unsigned int i = 0; i < HashMapConcurrente::cantLetras; i++)
     {
         mutexes[i].lock();
@@ -71,12 +71,13 @@ unsigned int HashMapConcurrente::valor(std::string clave)
     unsigned int res = 0;
     unsigned int index = HashMapConcurrente::hashIndex(clave);
     mutexes[index].lock();
-    unsigned int longitud = tabla[i]->longitud();
+    unsigned int longitud = tabla[index]->longitud();
     for(unsigned int i = 0; i < longitud; i++){
         auto &elemento = tabla[i]->iesimo(i);
-        if(elemento.first == clave)
+        if(elemento.first == clave){
             res = elemento.second;
             break;
+        }
     }
     mutexes[index].unlock();
     return res;
@@ -107,12 +108,12 @@ hashMapPair HashMapConcurrente::maximo()
     return *max;
 }
 
-hashMapPair threadFila(){
+void* HashMapConcurrente::threadFila(void* arg){
     unsigned int myIndex = indexParalelo.fetch_add(1);
     while(myIndex < 26){
         hashMapPair *maximoParcial = new hashMapPair();
         maximoParcial->second = 0;
-        mutex[myIndex].lock();
+        HashMapConcurrente::mutexes[myIndex].lock();
         for(auto it = tabla[myIndex]->crearIt();
             it.haySiguiente();
             it.avanzar()){
@@ -122,35 +123,39 @@ hashMapPair threadFila(){
                     maximoParcial->second = it.siguiente().second;
                 }
             }
-        mutex[myIndex].unlock();
+        mutexes[myIndex].unlock();
         maximosParciales.push_back(*maximoParcial);
         myIndex = indexParalelo.fetch_add(1);
     }
+    pthread_exit(NULL);
+}
 
+static void* wrapperThreadFila(void* context){
+    return ((HashMapConcurrente*)context)->threadFila(NULL);
 }
 
 hashMapPair HashMapConcurrente::maximoParalelo(unsigned int cantThreads)
 {
     pthread_t threads[cantThreads];
     indexParalelo = 0;
-    maximosParciales = vector<hashMapPair>(26);
+    maximosParciales = std::vector<hashMapPair>(26);
     for(unsigned int i = 0; i < cantThreads; i++){
-        pthread_create(&(threads[i]), NULL, &HashMapConcurrente::threadFila, NULL)
+        pthread_create(&(threads[i]), NULL, &this->wrapperThreadFila, this);
     }
 
     for(auto id : threads)
         pthread_join(id, NULL);
 
-    hashMapPair maximo = new hashMapPair();
-    maximo.second = 0;
+    hashMapPair *maximo = new hashMapPair();
+    maximo->second = 0;
     for(auto p : maximosParciales){
-        if(p.second > maximo.second){
-            maximo.first = p.first;
-            maximo.second = p.second;
+        if(p.second > maximo->second){
+            maximo->first = p.first;
+            maximo->second = p.second;
         }
     }
 
-    return maximo;
+    return *maximo;
 
 }
 
