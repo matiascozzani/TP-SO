@@ -24,12 +24,11 @@ public:
 
    hashMapPair maximo();
    hashMapPair maximoParalelo(unsigned int cantThreads);
-   void* threadFila(void* arg);
 
 
 private:
    ListaAtomica<hashMapPair> *tabla[HashMapConcurrente::cantLetras];
-   static void* wrapperThreadFila(void* arg);
+   void threadFila();
    static unsigned int hashIndex(std::string clave);
    std::atomic<int> indexParalelo;
    std::vector<hashMapPair> maximosParciales;

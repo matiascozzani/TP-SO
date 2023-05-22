@@ -3,7 +3,7 @@
 
 #include <iostream>
 #include <fstream>
-#include <pthread.h>
+#include <thread>
 
 #include "HashMapConcurrente.hpp"
 
@@ -66,6 +66,8 @@ std::vector<std::string> HashMapConcurrente::claves()
     return aux;
 }
 
+//TODO: implementar estructura incremental para claves -> podría ser una cola?
+
 unsigned int HashMapConcurrente::valor(std::string clave)
 {
     unsigned int res = 0;
@@ -108,7 +110,7 @@ hashMapPair HashMapConcurrente::maximo()
     return *max;
 }
 
-void* HashMapConcurrente::threadFila(void* arg){
+void HashMapConcurrente::threadFila(){
     unsigned int myIndex = indexParalelo.fetch_add(1);
     while(myIndex < 26){
         hashMapPair *maximoParcial = new hashMapPair();
@@ -127,24 +129,19 @@ void* HashMapConcurrente::threadFila(void* arg){
         maximosParciales.push_back(*maximoParcial);
         myIndex = indexParalelo.fetch_add(1);
     }
-    pthread_exit(NULL);
-}
-
-static void* wrapperThreadFila(void* context){
-    return ((HashMapConcurrente*)context)->threadFila(NULL);
 }
 
 hashMapPair HashMapConcurrente::maximoParalelo(unsigned int cantThreads)
 {
-    pthread_t threads[cantThreads];
+    std::vector<std::thread> threads;
     indexParalelo = 0;
     maximosParciales = std::vector<hashMapPair>(26);
     for(unsigned int i = 0; i < cantThreads; i++){
-        pthread_create(&(threads[i]), NULL, &this->wrapperThreadFila, this);
+        threads.emplace_back(threadFila);
     }
 
-    for(auto id : threads)
-        pthread_join(id, NULL);
+    for(auto &id : threads)
+        id.join();
 
     hashMapPair *maximo = new hashMapPair();
     maximo->second = 0;
@@ -155,8 +152,7 @@ hashMapPair HashMapConcurrente::maximoParalelo(unsigned int cantThreads)
         }
     }
 
-    return *maximo;
-
+    return *maximo; 
 }
 
 #endif
