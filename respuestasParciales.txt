@@ -59,3 +59,20 @@
 
     De este modo, si dos threads quieren realizar operaciones sobre entradas distintas de la tabla de hash
     podrán hacerlo sin problemas. Cuando no sea este el caso, habrá contención y una deberá esperar a que la otra termine para efectuar sus operaciones.
+
+
+    4.a) No fué necesario, la función incrementar ya implementa estructuras de sincronización.
+
+    b) Para CargarMultiplesArchivos se decide implementar
+    un entero atómico para poder llevar la cuenta de que archivo debe procesar
+    cada thread cada vez, es atómico para salvar las race-conditions.
+
+    Luego, disparamos cada thread con la información correcta.
+    Cada thread utiliza el int atómico para referenciar que archivo debe procesar
+    en cada paso, y llama a cargarArchivo.
+
+    No hace falta implementar estructuras extra de sincornzaión debido a que la función
+    cargar archivo llama a incrementar de hashmap concurrente que ya tiene 
+    comportamientos de contención incorporados.
+
+    

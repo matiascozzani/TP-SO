@@ -24,15 +24,15 @@ void HashMapConcurrente::incrementar(std::string clave)
 {
     // obtenemos el indice al que debería pertenecer esta clave si existe.
     unsigned int claveIndex = hashIndex(clave);
+    mutexes[claveIndex].lock();
     // obtenemos la longitud de la lista atómica asociada con esta clave
-
     // debería encerrarse todo esto en un while(true)?
-    unsigned int longitudTabla = tabla[claveIndex]->longitud();
+    ListaAtomica<hashMapPair> *entrada = (this->tabla)[claveIndex];
+    unsigned int longitudTabla = (*entrada).longitud();
     // la recorremos y queremos ver si está presente o no
     bool clavePresente = false;
     for (unsigned int i = 0; i < longitudTabla; i++)
     {
-        mutexes[claveIndex].lock();
         auto &elemento = tabla[claveIndex]->iesimo(i);
         if (elemento.first == clave)
         {   
@@ -45,9 +45,9 @@ void HashMapConcurrente::incrementar(std::string clave)
     // si la clave no estaba presente, la insertamos.
     if (!clavePresente)
     {
-        tabla[claveIndex]->insertar(make_pair(clave, 1));
+        entrada->insertar(make_pair(clave, 1));
+        mutexes[claveIndex].unlock();
     }
-    mutexes[claveIndex].unlock();
 }
 
 std::vector<std::string> HashMapConcurrente::claves()
@@ -73,9 +73,10 @@ unsigned int HashMapConcurrente::valor(std::string clave)
     unsigned int res = 0;
     unsigned int index = HashMapConcurrente::hashIndex(clave);
     mutexes[index].lock();
-    unsigned int longitud = tabla[index]->longitud();
+    ListaAtomica<hashMapPair> *entrada = (this->tabla)[index];
+    unsigned int longitud = entrada->longitud();
     for(unsigned int i = 0; i < longitud; i++){
-        auto &elemento = tabla[i]->iesimo(i);
+        auto &elemento = entrada->iesimo(i);
         if(elemento.first == clave){
             res = elemento.second;
             break;
@@ -93,10 +94,7 @@ hashMapPair HashMapConcurrente::maximo()
     for (unsigned int index = 0; index < HashMapConcurrente::cantLetras; index++)
     {  
         mutexes[index].lock();
-        for (
-            auto it = tabla[index]->crearIt();
-            it.haySiguiente();
-            it.avanzar())
+        for (auto it = tabla[index]->crearIt(); it.haySiguiente(); it.avanzar())
         {
             if (it.siguiente().second > max->second)
             {
@@ -116,7 +114,8 @@ void HashMapConcurrente::threadFila(){
         hashMapPair *maximoParcial = new hashMapPair();
         maximoParcial->second = 0;
         HashMapConcurrente::mutexes[myIndex].lock();
-        for(auto it = tabla[myIndex]->crearIt();
+        ListaAtomica<hashMapPair> *entrada = (this->tabla)[myIndex];
+        for(auto it = entrada->crearIt();
             it.haySiguiente();
             it.avanzar()){
                 if(it.siguiente().second > maximoParcial->second)
@@ -133,11 +132,11 @@ void HashMapConcurrente::threadFila(){
 
 hashMapPair HashMapConcurrente::maximoParalelo(unsigned int cantThreads)
 {
-    std::vector<std::thread> threads;
+    std::vector<std::thread> threads(cantThreads);
     indexParalelo = 0;
     maximosParciales = std::vector<hashMapPair>(26);
     for(unsigned int i = 0; i < cantThreads; i++){
-        threads.emplace_back(threadFila);
+        threads[i] = std::thread(&HashMapConcurrente::threadFila, this);
     }
 
     for(auto &id : threads)
