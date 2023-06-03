@@ -28,6 +28,7 @@ int main(int argc, char **argv) {
 
     HashMapConcurrente hashMap = HashMapConcurrente();
     cargarMultiplesArchivos(hashMap, cantThreadsLectura, filePaths);
+    
     auto maximo = hashMap.maximoParalelo(cantThreadsMaximo);
 
     std::cout << maximo.first << " " << maximo.second << std::endl;

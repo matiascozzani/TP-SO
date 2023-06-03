@@ -4,6 +4,7 @@
 #include <iostream>
 #include <fstream>
 #include <thread>
+#include <algorithm>
 
 #include "HashMapConcurrente.hpp"
 
@@ -24,10 +25,10 @@ void HashMapConcurrente::incrementar(std::string clave)
 {
     // obtenemos el indice al que debería pertenecer esta clave si existe.
     unsigned int claveIndex = hashIndex(clave);
-    mutexes[claveIndex].lock();
     // obtenemos la longitud de la lista atómica asociada con esta clave
     // debería encerrarse todo esto en un while(true)?
     ListaAtomica<hashMapPair> *entrada = (this->tabla)[claveIndex];
+    mutexes[claveIndex].lock();
     unsigned int longitudTabla = (*entrada).longitud();
     // la recorremos y queremos ver si está presente o no
     bool clavePresente = false;
@@ -109,11 +110,11 @@ hashMapPair HashMapConcurrente::maximo()
 }
 
 void HashMapConcurrente::threadFila(){
-    unsigned int myIndex = indexParalelo.fetch_add(1);
+    unsigned int myIndex = indexParalelo.fetch_add(1, std::memory_order_relaxed);
     while(myIndex < 26){
         hashMapPair *maximoParcial = new hashMapPair();
         maximoParcial->second = 0;
-        HashMapConcurrente::mutexes[myIndex].lock();
+        //HashMapConcurrente::mutexes[myIndex].lock();
         ListaAtomica<hashMapPair> *entrada = (this->tabla)[myIndex];
         for(auto it = entrada->crearIt();
             it.haySiguiente();
@@ -124,9 +125,9 @@ void HashMapConcurrente::threadFila(){
                     maximoParcial->second = it.siguiente().second;
                 }
             }
-        mutexes[myIndex].unlock();
-        maximosParciales.push_back(*maximoParcial);
-        myIndex = indexParalelo.fetch_add(1);
+        //mutexes[myIndex].unlock();
+        maximosParciales[myIndex] = (*maximoParcial);
+        myIndex = indexParalelo.fetch_add(1, std::memory_order_relaxed);
     }
 }
 
@@ -142,16 +143,16 @@ hashMapPair HashMapConcurrente::maximoParalelo(unsigned int cantThreads)
     for(auto &id : threads)
         id.join();
 
-    hashMapPair *maximo = new hashMapPair();
+    /*hashMapPair *maximo = new hashMapPair();
     maximo->second = 0;
     for(auto p : maximosParciales){
         if(p.second > maximo->second){
             maximo->first = p.first;
             maximo->second = p.second;
         }
-    }
+    }*/
 
-    return *maximo; 
+    return *std::max_element(maximosParciales.begin(), maximosParciales.end(), [](const hashMapPair &a, const hashMapPair &b){return a.second < b.second;}); 
 }
 
 #endif
