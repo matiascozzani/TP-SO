@@ -8,7 +8,7 @@ int main(int argc, char **argv) {
     struct timespec cargaStart, cargaEnd;
     struct timespec maxStart, maxEnd;
     if (argc < 4) {
-        std::cout << "Error: faltan argumentos." << std::endl;
+        std::cout << "Error: faltan argumentos. Solo se proporcionaron: " << argc << std::endl;
         std::cout << std::endl;
         std::cout << "Modo de uso: " << argv[0] << " <threads_lectura> <threads_maximo>" << std::endl;
         std::cout << "    " << "<archivo1> [<archivo2>...]" << std::endl;
