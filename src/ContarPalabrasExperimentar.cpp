@@ -81,9 +81,8 @@ int main(int argc, char **argv) {
             for(size_t j = 0; j < tiempoPorThread[i].size(); j++){
                 std::cout << tiempos[i][j] << " ";
             }
-            std::cout << "\n";
+            std::cout << std::endl;
         }
-        std::cout << "" << std::endl;
     }
 
     return 0;

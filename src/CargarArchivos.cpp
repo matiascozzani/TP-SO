@@ -33,7 +33,7 @@ std::vector<std::pair<timespec, timespec>> cargarArchivo2(
 
         if(actualLetter != (unsigned int)palabraActual[0] - 'a'){
             clock_gettime(CLOCK_REALTIME, &letterEnd);
-            tiempoPorLetra[(unsigned int)palabraActual[0]-'a'] = std::make_pair(letterStart, letterEnd);
+            tiempoPorLetra[actualLetter] = std::make_pair(letterStart, letterEnd);
             actualLetter = (unsigned int)palabraActual[0] - 'a';
             clock_gettime(CLOCK_REALTIME, &letterStart);
         }
