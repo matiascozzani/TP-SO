@@ -23,26 +23,30 @@ int main(int argc, char **argv) {
     }
     int cantThreadsLectura = std::stoi(argv[1]);
     int cantThreadsMaximo = std::stoi(argv[2]);
+    int modo = std::stoi(argv[3]);
 
     std::vector<std::string> filePaths = {};
-    for (int i = 3; i < argc; i++) {
+    for (int i = 4; i < argc; i++) {
         filePaths.push_back(argv[i]);
     }
 
     HashMapConcurrente hashMap = HashMapConcurrente();
+    std::vector<std::vector<std::pair<timespec, timespec>>> tiempoPorThread;
     
-    if(cantThreadsLectura != 0) {
-        clock_gettime(CLOCK_REALTIME, &cargaStart);
-        cargarMultiplesArchivos(hashMap, cantThreadsLectura, filePaths);
-        clock_gettime(CLOCK_REALTIME, &cargaEnd);
-    }
-    else{
-        clock_gettime(CLOCK_REALTIME, &cargaStart);
-        for(int i = 0; i < filePaths.size(); i++){
-            cargarArchivo(hashMap, filePaths[i]);
+    if(modo == 0){
+        if(cantThreadsLectura != 0){
+            clock_gettime(CLOCK_REALTIME, &cargaStart);
+            cargarMultiplesArchivos(hashMap, cantThreadsLectura, filePaths);
+            clock_gettime(CLOCK_REALTIME, &cargaEnd);
+        }else{
+            clock_gettime(CLOCK_REALTIME, &cargaStart);
+            for(unsigned int i = 0; i < filePaths.size(); i++){
+                cargarArchivo(hashMap, filePaths[i]);
+            }
+            clock_gettime(CLOCK_REALTIME, &cargaEnd);
         }
-        clock_gettime(CLOCK_REALTIME, &cargaEnd);
-
+    }else{
+        tiempoPorThread = cargarMultiplesArchivos2(hashMap, cantThreadsLectura, filePaths);
     }
     double startTime = (double)(cargaEnd.tv_sec - cargaStart.tv_sec)
                   + (double)(cargaEnd.tv_nsec - cargaStart.tv_nsec) 
@@ -60,7 +64,27 @@ int main(int argc, char **argv) {
     }
     double maxTime = ((maxEnd.tv_sec - maxStart.tv_sec) + (double)(maxEnd.tv_nsec - maxStart.tv_nsec)) / BILLION;
 
-    std::cout << startTime << " " << maxTime << " " << maximo.first << " " << maximo.second << std::endl;
+    if(modo==0) std::cout << startTime << " " << maxTime << " " << maximo.first << " " << maximo.second << std::endl;
+    else{
+        std::vector<std::vector<double>> tiempos;
+        for(size_t i = 0; i < tiempoPorThread.size(); i++){
+            std::vector<double> tiemposAux;
+            for(size_t j = 0; j < tiempoPorThread[i].size(); j++){
+                std::pair<timespec, timespec> currTime = tiempoPorThread[i][j];
+                double time = ((currTime.second.tv_sec - currTime.first.tv_sec) + (double)(currTime.second.tv_nsec - currTime.first.tv_nsec)) / BILLION;
+                tiemposAux.push_back(time);
+            };
+            tiempos.push_back(tiemposAux);
+        }
+
+        for(size_t i = 0; i < tiempoPorThread.size(); i++){
+            for(size_t j = 0; j < tiempoPorThread[i].size(); j++){
+                std::cout << tiempos[i][j] << " ";
+            }
+            std::cout << "\n";
+        }
+        std::cout << "" << std::endl;
+    }
 
     return 0;
 }
