@@ -11,8 +11,7 @@
 
 std::vector<std::pair<timespec, timespec>> cargarArchivo2(
     HashMapConcurrente &hashMap,
-    std::string filePath
-) {
+    std::string filePath, int i) {
     std::fstream file;
     int cant = 0;
     std::string palabraActual;
@@ -33,6 +32,7 @@ std::vector<std::pair<timespec, timespec>> cargarArchivo2(
 
         if(actualLetter != (unsigned int)palabraActual[0] - 'a'){
             clock_gettime(CLOCK_REALTIME, &letterEnd);
+            std::cout << "SOY THREAD " << i << " APPENDEO A TIEMPO " << actualLetter << " " << letterStart.tv_sec << "," << letterEnd.tv_sec << std::endl;
             tiempoPorLetra[actualLetter] = std::make_pair(letterStart, letterEnd);
             actualLetter = (unsigned int)palabraActual[0] - 'a';
             clock_gettime(CLOCK_REALTIME, &letterStart);
@@ -48,10 +48,9 @@ std::vector<std::pair<timespec, timespec>> cargarArchivo2(
         file.close();
         return tiempoPorLetra;
     }
-
+    file.close();
     clock_gettime(CLOCK_REALTIME, &letterEnd);
     tiempoPorLetra[25] = std::make_pair(letterStart, letterEnd);
-    file.close();
     return tiempoPorLetra;
 }
 
@@ -99,7 +98,7 @@ void cargarArchivoThread(std::atomic<int>& currentFile, std::vector<std::string>
     }
 }
 
-void cargarArchivoThread2(std::atomic<int>& currentFile, std::vector<std::string> &filePaths, int maxFiles, HashMapConcurrente& hashMap, 
+void cargarArchivoThread2(std::atomic<int>& currentFile, std::vector<std::string> &filePaths, int maxFiles, HashMapConcurrente& hashMap,
                         std::vector<std::pair<timespec, timespec>>& tiempoThread){
     //recibimos los parámetros por referencia.
     //current file tiene el int atómico que sirve para que dos threads no se pisen
@@ -109,7 +108,7 @@ void cargarArchivoThread2(std::atomic<int>& currentFile, std::vector<std::string
     int currIndex = currentFile.fetch_add(1);
     //obtenemos e incrementamos atómicamente el int.
     while(currIndex < maxFiles){ //<- chequiamos que haya files por procesar
-        tiempoThread = cargarArchivo2(hashMap, filePaths[currIndex]); //<- procesamos
+        tiempoThread = cargarArchivo2(hashMap, filePaths[currIndex], currIndex); //<- procesamos
         currIndex = currentFile.fetch_add(1); //<- incrementamos y obtenemos el valor anterior atómicamente
     }
 }
@@ -127,7 +126,6 @@ std::vector<std::vector<std::pair<timespec, timespec>>> cargarMultiplesArchivos2
 
     }else{
         for(unsigned int i = 0; i < cantThreads; i++) {
-            std::vector<std::pair<timespec, timespec>> tiempoThread;
             threads[i] = std::thread(&cargarArchivoThread2, std::ref(currentFile), std::ref(filePaths), maxFiles, std::ref(hashMap), std::ref(tiempoPorThread[i]));
         }
     
@@ -135,6 +133,14 @@ std::vector<std::vector<std::pair<timespec, timespec>>> cargarMultiplesArchivos2
             //joineamos y esperamos a que terminen
             thread.join();
         }
+
+        for(size_t i = 0; i < tiempoPorThread.size(); i++){
+            for(size_t j = 0; j < tiempoPorThread[i].size(); j++){
+                std::cout << tiempoPorThread[i][j].first.tv_sec << " ";
+            }
+            std::cout << std::endl;
+        }
+
     }
     return tiempoPorThread;
 }
