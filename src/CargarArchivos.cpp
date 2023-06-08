@@ -11,7 +11,7 @@
 
 std::vector<std::pair<timespec, timespec>> cargarArchivo2(
     HashMapConcurrente &hashMap,
-    std::string filePath, int i) {
+    std::string filePath) {
     std::fstream file;
     int cant = 0;
     std::string palabraActual;
@@ -32,7 +32,6 @@ std::vector<std::pair<timespec, timespec>> cargarArchivo2(
 
         if(actualLetter != (unsigned int)palabraActual[0] - 'a'){
             clock_gettime(CLOCK_REALTIME, &letterEnd);
-            std::cout << "SOY THREAD " << i << " APPENDEO A TIEMPO " << actualLetter << " " << letterStart.tv_sec << "," << letterEnd.tv_sec << std::endl;
             tiempoPorLetra[actualLetter] = std::make_pair(letterStart, letterEnd);
             actualLetter = (unsigned int)palabraActual[0] - 'a';
             clock_gettime(CLOCK_REALTIME, &letterStart);
@@ -42,6 +41,11 @@ std::vector<std::pair<timespec, timespec>> cargarArchivo2(
         hashMap.incrementar(palabraActual);
         cant++;
     }
+
+    clock_gettime(CLOCK_REALTIME, &letterEnd);
+    tiempoPorLetra[actualLetter] = std::make_pair(letterStart, letterEnd);
+
+
     // Cierro el archivo.
     if (!file.eof()) {
         std::cerr << "Error al leer el archivo" << std::endl;
@@ -49,8 +53,7 @@ std::vector<std::pair<timespec, timespec>> cargarArchivo2(
         return tiempoPorLetra;
     }
     file.close();
-    clock_gettime(CLOCK_REALTIME, &letterEnd);
-    tiempoPorLetra[25] = std::make_pair(letterStart, letterEnd);
+
     return tiempoPorLetra;
 }
 
@@ -100,21 +103,16 @@ void cargarArchivoThread(std::atomic<int>& currentFile, std::vector<std::string>
 
 void cargarArchivoThread2(std::atomic<int>& currentFile, std::vector<std::string> &filePaths, int maxFiles, HashMapConcurrente& hashMap,
                         std::vector<std::pair<timespec, timespec>>& tiempoThread){
-    //recibimos los parámetros por referencia.
-    //current file tiene el int atómico que sirve para que dos threads no se pisen
-    //filepaths es el vector de strings, lo pasamos por refercia para ahorrar memoria
-    //maxfiles es la cantidad maxima de files que hay en el vector.
-    //el hashmap que modificar también recibido por referencia.
     int currIndex = currentFile.fetch_add(1);
     //obtenemos e incrementamos atómicamente el int.
     while(currIndex < maxFiles){ //<- chequiamos que haya files por procesar
-        tiempoThread = cargarArchivo2(hashMap, filePaths[currIndex], currIndex); //<- procesamos
+        tiempoThread = cargarArchivo2(hashMap, filePaths[currIndex]); //<- procesamos
         currIndex = currentFile.fetch_add(1); //<- incrementamos y obtenemos el valor anterior atómicamente
     }
 }
 
 std::vector<std::vector<std::pair<timespec, timespec>>> cargarMultiplesArchivos2(HashMapConcurrente &hashMap,unsigned int cantThreads, std::vector<std::string> filePaths) {
-    std::vector<std::thread> threads(cantThreads);
+    std::vector<std::thread> threads;
     std::atomic<int> currentFile(0);
     int maxFiles = filePaths.size();
     std::vector<std::vector<std::pair<timespec, timespec>>> tiempoPorThread(cantThreads);
@@ -126,7 +124,8 @@ std::vector<std::vector<std::pair<timespec, timespec>>> cargarMultiplesArchivos2
 
     }else{
         for(unsigned int i = 0; i < cantThreads; i++) {
-            threads[i] = std::thread(&cargarArchivoThread2, std::ref(currentFile), std::ref(filePaths), maxFiles, std::ref(hashMap), std::ref(tiempoPorThread[i]));
+            //threads[i] = std::thread(&cargarArchivoThread2, std::ref(currentFile), std::ref(filePaths), maxFiles, std::ref(hashMap), std::ref(tiempoPorThread[i]));
+            threads.emplace_back(&cargarArchivoThread2, std::ref(currentFile), std::ref(filePaths), maxFiles, std::ref(hashMap), std::ref(tiempoPorThread[i]));
         }
     
         for(auto &thread : threads) {
@@ -134,12 +133,12 @@ std::vector<std::vector<std::pair<timespec, timespec>>> cargarMultiplesArchivos2
             thread.join();
         }
 
-        for(size_t i = 0; i < tiempoPorThread.size(); i++){
+        /*for(size_t i = 0; i < tiempoPorThread->size(); i++){
             for(size_t j = 0; j < tiempoPorThread[i].size(); j++){
                 std::cout << tiempoPorThread[i][j].first.tv_sec << " ";
             }
             std::cout << std::endl;
-        }
+        }*/
 
     }
     return tiempoPorThread;
