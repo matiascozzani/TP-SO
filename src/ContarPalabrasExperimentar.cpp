@@ -71,7 +71,6 @@ int main(int argc, char **argv) {
             std::vector<double> tiemposAux;
             for(size_t j = 0; j < tiempoPorThread[i].size(); j++){
                 std::pair<timespec, timespec> currTime = tiempoPorThread[i][j];
-                std::cout << "CURRTIME: " << currTime.first.tv_sec << " " << currTime.second.tv_nsec << " " << i << "," << j << std::endl;
                 double time = ((currTime.second.tv_sec - currTime.first.tv_sec) + (double)(currTime.second.tv_nsec - currTime.first.tv_nsec)) / BILLION;
                 tiemposAux.push_back(time);
             };

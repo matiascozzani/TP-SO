@@ -8,7 +8,7 @@
 #include <atomic>
 
 #include "CargarArchivos.hpp"
-
+std::vector<std::vector<std::pair<timespec, timespec>>> tiempoPorThread;
 std::vector<std::pair<timespec, timespec>> cargarArchivo2(
     HashMapConcurrente &hashMap,
     std::string filePath) {
@@ -101,12 +101,11 @@ void cargarArchivoThread(std::atomic<int>& currentFile, std::vector<std::string>
     }
 }
 
-void cargarArchivoThread2(std::atomic<int>& currentFile, std::vector<std::string> &filePaths, int maxFiles, HashMapConcurrente& hashMap,
-                        std::vector<std::pair<timespec, timespec>>& tiempoThread){
+void cargarArchivoThread2(std::atomic<int>& currentFile, std::vector<std::string> &filePaths, int maxFiles, HashMapConcurrente& hashMap){
     int currIndex = currentFile.fetch_add(1);
     //obtenemos e incrementamos atómicamente el int.
     while(currIndex < maxFiles){ //<- chequiamos que haya files por procesar
-        tiempoThread = cargarArchivo2(hashMap, filePaths[currIndex]); //<- procesamos
+        tiempoPorThread[currIndex] = cargarArchivo2(hashMap, filePaths[currIndex]); //<- procesamos
         currIndex = currentFile.fetch_add(1); //<- incrementamos y obtenemos el valor anterior atómicamente
     }
 }
@@ -115,32 +114,27 @@ std::vector<std::vector<std::pair<timespec, timespec>>> cargarMultiplesArchivos2
     std::vector<std::thread> threads;
     std::atomic<int> currentFile(0);
     int maxFiles = filePaths.size();
-    std::vector<std::vector<std::pair<timespec, timespec>>> tiempoPorThread(cantThreads);
-    if(cantThreads == 0){
-        tiempoPorThread.push_back(std::vector<std::pair<timespec, timespec>>());
-        std::thread th = std::thread(&cargarArchivoThread2, std::ref(currentFile), std::ref(filePaths), maxFiles, std::ref(hashMap), std::ref(tiempoPorThread[0]));
 
-        th.join();
+    for(int i = 0; i < 10; i++){
+        tiempoPorThread.push_back(std::vector<std::pair<timespec, timespec>>());
+    }
+
+    if(cantThreads == 0){
+        threads.emplace_back(&cargarArchivoThread2, std::ref(currentFile), std::ref(filePaths), maxFiles, std::ref(hashMap));
 
     }else{
         for(unsigned int i = 0; i < cantThreads; i++) {
             //threads[i] = std::thread(&cargarArchivoThread2, std::ref(currentFile), std::ref(filePaths), maxFiles, std::ref(hashMap), std::ref(tiempoPorThread[i]));
-            threads.emplace_back(&cargarArchivoThread2, std::ref(currentFile), std::ref(filePaths), maxFiles, std::ref(hashMap), std::ref(tiempoPorThread[i]));
+            threads.emplace_back(&cargarArchivoThread2, std::ref(currentFile), std::ref(filePaths), maxFiles, std::ref(hashMap));
         }
-    
-        for(auto &thread : threads) {
-            //joineamos y esperamos a que terminen
-            thread.join();
-        }
-
-        /*for(size_t i = 0; i < tiempoPorThread->size(); i++){
-            for(size_t j = 0; j < tiempoPorThread[i].size(); j++){
-                std::cout << tiempoPorThread[i][j].first.tv_sec << " ";
-            }
-            std::cout << std::endl;
-        }*/
-
     }
+
+        
+    for(auto &thread : threads) {
+            //joineamos y esperamos a que terminen
+        thread.join();
+    }
+
     return tiempoPorThread;
 }
 /*
