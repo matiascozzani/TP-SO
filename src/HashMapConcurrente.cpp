@@ -8,6 +8,11 @@
 
 #include "HashMapConcurrente.hpp"
 
+std::vector<std::mutex> readers(26);
+std::vector<std::mutex> writers(26);
+std::vector<int> cantLectores(26);
+
+
 HashMapConcurrente::HashMapConcurrente()
 {
     for (unsigned int i = 0; i < HashMapConcurrente::cantLetras; i++)
@@ -28,7 +33,7 @@ void HashMapConcurrente::incrementar(std::string clave)
     // obtenemos la longitud de la lista atómica asociada con esta clave
     // debería encerrarse todo esto en un while(true)?
     ListaAtomica<hashMapPair> *entrada = (this->tabla)[claveIndex];
-    mutexes[claveIndex].lock();
+    writers[claveIndex].lock();
     unsigned int longitudTabla = (*entrada).longitud();
     // la recorremos y queremos ver si está presente o no
     bool clavePresente = false;
@@ -38,7 +43,7 @@ void HashMapConcurrente::incrementar(std::string clave)
         if (elemento.first == clave)
         {   
             elemento.second++;
-            mutexes[claveIndex].unlock();
+            writers[claveIndex].unlock();
             clavePresente = true;
             break;
         }
@@ -47,33 +52,45 @@ void HashMapConcurrente::incrementar(std::string clave)
     if (!clavePresente)
     {
         entrada->insertar(make_pair(clave, 1));
-        mutexes[claveIndex].unlock();
+        writers[claveIndex].unlock();
     }
 }
+
 
 std::vector<std::string> HashMapConcurrente::claves()
 {
     std::vector<std::string> aux;
     for (unsigned int i = 0; i < HashMapConcurrente::cantLetras; i++)
     {
-        mutexes[i].lock();
+        readers[i].lock();
+        cantLectores[i]++;
+        if(cantLectores[i] == 1) writers[i].lock();
+        readers[i].unlock();
+
         unsigned int longitud = tabla[i]->longitud();
         for(unsigned int j = 0; j < longitud; j++){
             auto &elemento = tabla[i]->iesimo(j);
             aux.push_back(elemento.first);
         }
-        mutexes[i].unlock();
+        
+        readers[i].lock();
+        cantLectores[i]--;
+        if(cantLectores[i] == 0) writers[i].unlock();
+        readers[i].unlock();
     }
     return aux;
 }
-
-//TODO: implementar estructura incremental para claves -> podría ser una cola?
 
 unsigned int HashMapConcurrente::valor(std::string clave)
 {
     unsigned int res = 0;
     unsigned int index = HashMapConcurrente::hashIndex(clave);
-    mutexes[index].lock();
+
+    readers[index].lock();
+    cantLectores[index]++;
+    if(cantLectores[index] == 1) writers[index].lock();
+    readers[index].unlock();
+    
     ListaAtomica<hashMapPair> *entrada = (this->tabla)[index];
     unsigned int longitud = entrada->longitud();
     for(unsigned int i = 0; i < longitud; i++){
@@ -83,7 +100,12 @@ unsigned int HashMapConcurrente::valor(std::string clave)
             break;
         }
     }
-    mutexes[index].unlock();
+
+    readers[index].lock();
+    cantLectores[index]--;
+    if(cantLectores[index] == 0) writers[index].unlock();
+    readers[index].unlock();
+
     return res;
 }
 
@@ -94,7 +116,7 @@ hashMapPair HashMapConcurrente::maximo()
 
     for (unsigned int index = 0; index < HashMapConcurrente::cantLetras; index++)
     {  
-        mutexes[index].lock();
+        writers[index].lock();
         for (auto it = tabla[index]->crearIt(); it.haySiguiente(); it.avanzar())
         {
             if (it.siguiente().second > max->second)
@@ -103,7 +125,7 @@ hashMapPair HashMapConcurrente::maximo()
                 max->second = it.siguiente().second;
             }
         }
-        mutexes[index].unlock();
+        writers[index].unlock();
     }
 
     return *max;
@@ -114,7 +136,6 @@ void HashMapConcurrente::threadFila(){
     while(myIndex < 26){
         hashMapPair *maximoParcial = new hashMapPair();
         maximoParcial->second = 0;
-        //HashMapConcurrente::mutexes[myIndex].lock();
         ListaAtomica<hashMapPair> *entrada = (this->tabla)[myIndex];
         for(auto it = entrada->crearIt();
             it.haySiguiente();
@@ -125,7 +146,6 @@ void HashMapConcurrente::threadFila(){
                     maximoParcial->second = it.siguiente().second;
                 }
             }
-        //mutexes[myIndex].unlock();
         maximosParciales[myIndex] = (*maximoParcial);
         myIndex = indexParalelo.fetch_add(1, std::memory_order_relaxed);
     }
@@ -142,15 +162,6 @@ hashMapPair HashMapConcurrente::maximoParalelo(unsigned int cantThreads)
 
     for(auto &id : threads)
         id.join();
-
-    /*hashMapPair *maximo = new hashMapPair();
-    maximo->second = 0;
-    for(auto p : maximosParciales){
-        if(p.second > maximo->second){
-            maximo->first = p.first;
-            maximo->second = p.second;
-        }
-    }*/
 
     return *std::max_element(maximosParciales.begin(), maximosParciales.end(), [](const hashMapPair &a, const hashMapPair &b){return a.second < b.second;}); 
 }

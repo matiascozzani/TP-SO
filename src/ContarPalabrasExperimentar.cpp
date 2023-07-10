@@ -4,6 +4,10 @@
 #include "CargarArchivos.hpp"
 #define BILLION  1000000000L;
 
+/*
+Armado para realizar la ejecución de los experimentos de modo mas controlado.
+*/
+
 int main(int argc, char **argv) {
     struct timespec cargaStart, cargaEnd;
     struct timespec maxStart, maxEnd;
@@ -23,6 +27,8 @@ int main(int argc, char **argv) {
     }
     int cantThreadsLectura = std::stoi(argv[1]);
     int cantThreadsMaximo = std::stoi(argv[2]);
+    //Modo==0 implica utilización general
+    //Modo==1 es solo pensado para el experimento 1.3
     int modo = std::stoi(argv[3]);
 
     std::vector<std::string> filePaths = {};

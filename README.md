@@ -1,18 +1,11 @@
 # Trabajo práctico 1 - Threading
 
 ## Estructura
-* En la carpeta `src` encontrarán el código que deben completar.
-* En la carpeta `data` encontrarán algunos archivos que pueden usar para probar
-  su solución. Les recomendamos que hagan pruebas con otros archivos, en
-  particular, archivos de mayor tamaño.
-* En la carpeta `scripts` encontrarán un script de `awk` que pueden usar para
-  contar la cantidad de apariciones de palabras en un archivo. Combinando con
-  el comando `sort` pueden usarlo para averiguar las palabras con más
-  apariciones y contrastar con su solución, ejecutando:
-  ```
-  awk -f contar-palabras.awk <archivo> | sort -nk 2
-  ```
-  Las palabras más repetidas aparecerán al final del output.
+* En la carpeta `src` encontrarán el código que completado.
+* En la carpeta `Experimentos/data` encontarán los archivos asociados con los
+  experimentos corridos.
+* En la carpeta `scripts` encontrarán dos scripts utilizados para generar
+  y ordenar los archivos de experimentación.
 
 ## Compilación
 * El `Makefile` debería permitirles compilar el código con el comando `make`.
@@ -26,7 +19,14 @@
   * `threads_maximo` es la cantidad de threads que se usará para computar
     la palabra con más apariciones, y
   * `archivo1`, `archivo2`, etc. son los nombres de los archivos a procesar.
-
+* También es posible generar el binario de experimentación a través de la utilización
+  de `make exp`. Este ejecutable se corre de la siguiente forma:
+   ```
+  ./ContarPalabrasExperimentar <threads_lectura> <threads_maximo> <modo> <archivo1> [<archivo2>...]
+  ```
+  donde:
+  * `modo` establece si se desea utilizar el binario para el experimento 1.3 o no.
+  Si `modo == 1` se asume que se correrán misma cantidad de threads que archivos.
 ## Tests
 * Ejecutando `make test` podrán compilar y ejecutar una pequeña suite de tests
   unitarios. Estos tests solo pretenden facilitarles el proceso de desarrollo

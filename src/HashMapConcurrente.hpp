@@ -32,7 +32,6 @@ private:
    static unsigned int hashIndex(std::string clave);
    std::atomic<int> indexParalelo;
    std::vector<hashMapPair> maximosParciales;
-   std::mutex mutexes[HashMapConcurrente::cantLetras];
 
 };
 
